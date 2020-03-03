@@ -14,10 +14,7 @@ services:
 #  nginx:
 #    image: nginx
 
-  rabbitmq:
-    image: rabbitmq:3.8.2
-
-  web:
+  backend:
     build:
       context: .
       dockerfile: Dockerfile
