@@ -10,6 +10,7 @@ from openapi_genclient import (
     ApiException)
 from rest_framework import status
 
+from stocks.analysis import tasks
 from stocks.analysis.tasks import get_instruments_with_retry_on_rate_limit, retry_on_rate_limits_exception
 from stocks.settings import TINKOFF_INVESTMENTS_SANDBOX_OPEN_API_TOKEN
 
@@ -43,23 +44,20 @@ class TestTinkoffInvestmentsAPI(APITestCase):
             print(len(candles_response.payload.candles))
     pass
 
-    def test_foo(self):
-        get_instruments_with_retry_on_rate_limit()
+    def test_get_candles(self):
+        ticker = 'ALRS'
 
-    def test_bar(self):
-        from datetime import timedelta
+        tinkoff_client = sandbox_api_client(TINKOFF_INVESTMENTS_SANDBOX_OPEN_API_TOKEN)
+        response: MarketInstrumentListResponse = tinkoff_client.market.market_search_by_ticker_get(ticker)
 
-        three_weeks = timedelta(weeks=3)
-        one_day = timedelta(days=1)
-        print(three_weeks // one_day)
+        payload: MarketInstrumentList = response.payload
+        instrument: MarketInstrument = payload.instruments[0]
 
-    # def test_qux(self):
-    #     @retry_on_rate_limits_exception
-    #     def foo():
-    #         print('hi')
-    #         raise ApiException(status=429)
-    #
-    #     foo()
+        figi = instrument.figi
+        _from = timezone.now() - datetime.timedelta(days=4)
+        to = _from + datetime.timedelta(days=1)
+        granularity = CandleResolution._1MIN
+        tasks.get_candles(figi, _from, to, granularity)
 
 
 class TestGetLiquidStocks(APITestCase):

@@ -74,7 +74,10 @@ def pairwise(iterable):
     return zip(a, b)
 
 
-def get_candles(figi: str, granularity_interval: str, _from: datetime, to: datetime):
+def get_candles(figi: str, _from: datetime, to: datetime, granularity_interval: str):
+    if granularity_interval not in CandleResolution.allowable_values:
+        raise ValueError(f'granularity_interval = {granularity_interval} not in {CandleResolution.allowable_values}')
+
     overall_interval = to - _from
     max_overall_interval = get_max_overall_interval_from_granularity_interval(granularity_interval)
 
@@ -87,19 +90,23 @@ def get_candles(figi: str, granularity_interval: str, _from: datetime, to: datet
 
     tinkoff_client: SandboxOpenApi = sandbox_api_client(settings.TINKOFF_INVESTMENTS_SANDBOX_OPEN_API_TOKEN)
 
-    for start, end in pairwise(time_points):
+    # TODO: get, save instrument to database if does not exist yet
 
-        market_candles_get_with_retry_on_rate_limits = \
-            retry_on_rate_limits_exception(tinkoff_client.market.market_candles_get)
+    with transaction.atomic():
+        for start, end in pairwise(time_points):
 
-        response: CandlesResponse = market_candles_get_with_retry_on_rate_limits(figi,
-                                                                                 start,
-                                                                                 end,
-                                                                                 granularity_interval)
+            market_candles_get_with_retry_on_rate_limits = \
+                retry_on_rate_limits_exception(tinkoff_client.market.market_candles_get)
 
-        payload: Candles = response.payload
-        candles: List[Candle] = payload.candles
+            response: CandlesResponse = market_candles_get_with_retry_on_rate_limits(figi,
+                                                                                     start,
+                                                                                     end,
+                                                                                     granularity_interval)
 
-        for candle in candles:
-            # TODO: serialize and save candles
-            pass
+            payload: Candles = response.payload
+            candles: List[Candle] = payload.candles
+
+            for candle in candles:
+                # TODO: serialize and save candles
+                raise NotImplementedError('not implemented yet')
+                pass
