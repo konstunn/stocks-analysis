@@ -9,6 +9,10 @@ class Instrument(models.Model):
     type = models.CharField(max_length=20)
     isin = models.CharField(max_length=20)
 
+    class Meta:
+        verbose_name = 'Инструмент'
+        verbose_name_plural = 'Инструменты'
+
 
 class Candles(models.Model):
     instrument = models.ForeignKey(Instrument, models.CASCADE, related_name='candles')
@@ -17,3 +21,7 @@ class Candles(models.Model):
     # price_high
     # price_low
     # price_close
+
+    class Meta:
+        verbose_name = 'Котировка'
+        verbose_name_plural = 'Котировки'

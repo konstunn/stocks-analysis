@@ -6,11 +6,11 @@ from django.utils import timezone
 
 import openapi_genclient
 from openapi_genclient import (
-    MarketInstrumentListResponse, MarketInstrumentList, MarketInstrument, CandlesResponse, CandleResolution
-)
+    MarketInstrumentListResponse, MarketInstrumentList, MarketInstrument, CandlesResponse, CandleResolution,
+    ApiException)
 from rest_framework import status
 
-from stocks.analysis.tasks import get_instruments_with_retry_on_rate_limit
+from stocks.analysis.tasks import get_instruments_with_retry_on_rate_limit, retry_on_rate_limits_exception
 from stocks.settings import TINKOFF_INVESTMENTS_SANDBOX_OPEN_API_TOKEN
 
 from rest_framework.test import APITestCase
@@ -45,6 +45,21 @@ class TestTinkoffInvestmentsAPI(APITestCase):
 
     def test_foo(self):
         get_instruments_with_retry_on_rate_limit()
+
+    def test_bar(self):
+        from datetime import timedelta
+
+        three_weeks = timedelta(weeks=3)
+        one_day = timedelta(days=1)
+        print(three_weeks // one_day)
+
+    # def test_qux(self):
+    #     @retry_on_rate_limits_exception
+    #     def foo():
+    #         print('hi')
+    #         raise ApiException(status=429)
+    #
+    #     foo()
 
 
 class TestGetLiquidStocks(APITestCase):
