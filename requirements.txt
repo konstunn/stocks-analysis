@@ -15,6 +15,6 @@ pytz==2019.3
 requests==2.23.0
 six==1.14.0
 sqlparse==0.3.0
-tinkoff-invest-openapi-client==0.0.6
+tinkoff-invest-openapi-client==0.0.7
 urllib3==1.25.8
 websocket-client==0.56.0
