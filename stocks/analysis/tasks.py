@@ -3,7 +3,6 @@ import itertools
 import time
 from typing import List
 from datetime import datetime, timedelta
-import math
 
 from django.conf import settings
 from django.db import transaction
@@ -19,46 +18,34 @@ from openapi_genclient.exceptions import ApiException
 def retry_on_rate_limits_exception(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
+        delay = 1
         while True:
-            delay = 1
             try:
                 return func(*args, **kwargs)
             except ApiException as exc:
                 if exc.status == 429:
                     time.sleep(delay)
-                    delay = math.exp(delay + 1)
+                    delay *= 2
                 else:
                     raise
     return wrapper
 
 
-# run in background on demand
-def get_instruments_with_retry_on_rate_limit(currency=Currency.RUB):
-    while True:  # well, the code below is pretty clear, but endless loop is not a best practice in general
-        # FIXME: use tenacity, ratelimit and / or backoff
-        try:
-            tinkoff_client: SandboxOpenApi = sandbox_api_client(settings.TINKOFF_INVESTMENTS_SANDBOX_OPEN_API_TOKEN)
+@retry_on_rate_limits_exception
+def get_instruments(currency=Currency.RUB):
+    tinkoff_client: SandboxOpenApi = sandbox_api_client(settings.TINKOFF_INVESTMENTS_SANDBOX_OPEN_API_TOKEN)
 
-            response: MarketInstrumentListResponse = tinkoff_client.market.market_stocks_get()
-            payload: MarketInstrumentList = response.payload
-            instruments: List[MarketInstrument] = payload.instruments
-            instruments = list(filter(lambda i: i.currency == currency, instruments))
+    response: MarketInstrumentListResponse = tinkoff_client.market.market_stocks_get()
+    payload: MarketInstrumentList = response.payload
+    instruments: List[MarketInstrument] = payload.instruments
+    instruments = list(filter(lambda i: i.currency == currency, instruments))
 
-            with transaction.atomic():
-                for instrument in instruments:
-                    data = instrument.to_dict()
-                    instrument = InstrumentFromTinkoffSerializer(data=data)
-                    instrument.is_valid(raise_exception=True)
-                    instrument.save()
-
-            break
-
-        except ApiException as exc:
-            if exc.status == 429:
-                time.sleep(1)  # TODO: allow to customize, make it more flexible
-                continue
-            else:
-                raise
+    with transaction.atomic():
+        for instrument in instruments:
+            data = instrument.to_dict()
+            instrument = InstrumentFromTinkoffSerializer(data=data)
+            instrument.is_valid(raise_exception=True)
+            instrument.save()
 
 
 GRANULARITY_INTERVAL_TO_MAX_OVERALL_INTERVAL_MAP = {
@@ -102,26 +89,17 @@ def get_candles(figi: str, granularity_interval: str, _from: datetime, to: datet
 
     for start, end in pairwise(time_points):
 
-        while True:  # FIXME:
-            try:
-                response: CandlesResponse = tinkoff_client.market.market_candles_get(figi,
-                                                                                     start,
-                                                                                     end,
-                                                                                     granularity_interval)
+        market_candles_get_with_retry_on_rate_limits = \
+            retry_on_rate_limits_exception(tinkoff_client.market.market_candles_get)
 
-            except ApiException as exc:
-                if exc.status == 429:
-                    time.sleep(1)  # TODO: allow to customize, make it more flexible
-                    continue
-                else:
-                    raise
+        response: CandlesResponse = market_candles_get_with_retry_on_rate_limits(figi,
+                                                                                 start,
+                                                                                 end,
+                                                                                 granularity_interval)
 
-            payload: Candles = response.payload
-            candles: List[Candle] = payload.candles
-            for candle in candles:
-                pass
+        payload: Candles = response.payload
+        candles: List[Candle] = payload.candles
 
-            break
-
-    pass
-
+        for candle in candles:
+            # TODO: serialize and save candles
+            pass
