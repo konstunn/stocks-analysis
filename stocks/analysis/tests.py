@@ -11,7 +11,7 @@ from openapi_genclient import (
 from rest_framework import status
 
 from stocks.analysis import tasks
-from stocks.analysis.tasks import get_instruments_with_retry_on_rate_limit, retry_on_rate_limits_exception
+from stocks.analysis.tasks import get_instruments, retry_on_rate_limits_exception
 from stocks.settings import TINKOFF_INVESTMENTS_SANDBOX_OPEN_API_TOKEN
 
 from rest_framework.test import APITestCase

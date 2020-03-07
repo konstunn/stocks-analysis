@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.db import transaction
+
+from stocks.analysis.models import Instrument
 from stocks.analysis.serializers import InstrumentFromTinkoffSerializer
 
 from openapi_client.openapi import sandbox_api_client, SandboxOpenApi
@@ -90,9 +92,21 @@ def get_candles(figi: str, _from: datetime, to: datetime, granularity_interval: 
 
     tinkoff_client: SandboxOpenApi = sandbox_api_client(settings.TINKOFF_INVESTMENTS_SANDBOX_OPEN_API_TOKEN)
 
-    # TODO: get, save instrument to database if does not exist yet
-
     with transaction.atomic():
+
+        instrument = Instrument.objects.filter(figi=figi)
+        if not instrument:
+            market_search_by_figi_with_retry_on_rate_limits = \
+                retry_on_rate_limits_exception(tinkoff_client.market.market_search_by_figi_get)
+
+            response: MarketInstrumentListResponse = market_search_by_figi_with_retry_on_rate_limits(figi)
+            payload: MarketInstrumentList = response.payload
+            instruments: List[MarketInstrument] = payload.instruments
+            instrument = instruments[0]
+            instrument_serializer = InstrumentFromTinkoffSerializer(data=instrument.to_dict())
+            instrument_serializer.is_valid(raise_exception=True)
+            instrument_serializer.save()
+
         for start, end in pairwise(time_points):
 
             market_candles_get_with_retry_on_rate_limits = \

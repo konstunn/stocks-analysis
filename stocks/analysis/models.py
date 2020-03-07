@@ -14,7 +14,7 @@ class Instrument(models.Model):
         verbose_name_plural = 'Инструменты'
 
 
-class Candles(models.Model):
+class Candle(models.Model):
     instrument = models.ForeignKey(Instrument, models.CASCADE, related_name='candles')
     # datetime
     # price_open

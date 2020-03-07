@@ -1,7 +1,7 @@
 
 from rest_framework.serializers import ModelSerializer
 
-from stocks.analysis.models import Instrument
+from stocks.analysis.models import Instrument, Candle
 
 
 class InstrumentFromTinkoffSerializer(ModelSerializer):
