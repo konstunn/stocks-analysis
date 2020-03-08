@@ -1,7 +1,8 @@
 
 import os
 import datetime
-from datetime import timezone
+
+import pytz
 from django.utils import timezone
 
 import openapi_genclient
@@ -11,6 +12,7 @@ from openapi_genclient import (
 from rest_framework import status
 
 from stocks.analysis import tasks
+from stocks.analysis.models import Candle, Instrument
 from stocks.analysis.tasks import get_instruments, retry_on_rate_limits_exception
 from stocks.settings import TINKOFF_INVESTMENTS_SANDBOX_OPEN_API_TOKEN
 
@@ -44,7 +46,10 @@ class TestTinkoffInvestmentsAPI(APITestCase):
             print(len(candles_response.payload.candles))
     pass
 
-    def test_get_candles(self):
+
+class TestGetCandlesTask(APITestCase):
+    @staticmethod
+    def _get_figi():
         ticker = 'ALRS'
 
         tinkoff_client = sandbox_api_client(TINKOFF_INVESTMENTS_SANDBOX_OPEN_API_TOKEN)
@@ -53,18 +58,24 @@ class TestTinkoffInvestmentsAPI(APITestCase):
         payload: MarketInstrumentList = response.payload
         instrument: MarketInstrument = payload.instruments[0]
 
-        figi = instrument.figi
-        _from = timezone.now() - datetime.timedelta(days=4)
-        to = _from + datetime.timedelta(days=1)
-        granularity = CandleResolution._1MIN
+        return instrument.figi
+
+    def test_low_granularity(self):
+        figi = self._get_figi()
+        to = timezone.datetime(year=2020, month=2, day=8, tzinfo=pytz.UTC)
+        _from = to - datetime.timedelta(days=7)
+        granularity = CandleResolution.HOUR
         tasks.get_candles(figi, _from, to, granularity)
+        self.assertEqual(45, Candle.objects.count())
+        self.assertEqual(1, Instrument.objects.count())
+        # plus, if no exceptions were thrown, then everything was fine
 
-
-class TestGetLiquidStocks(APITestCase):
-    def test_get_from_moex(self):
-        url = 'https://iss.moex.com/iss/statistics/engines/stock/markets/index/analytics/MOEXBC.json'
-        response = requests.get(url)
-        self.assertEqual(status.HTTP_200_OK, response.status_code)
-        url = 'https://iss.moex.com/iss/engines/stock/'
-
-    pass
+    def test_high_granularity(self):
+        figi = self._get_figi()
+        to = timezone.datetime(year=2020, month=2, day=15, tzinfo=pytz.UTC)
+        _from = to - datetime.timedelta(days=14)
+        granularity = CandleResolution.HOUR
+        tasks.get_candles(figi, _from, to, granularity)
+        self.assertEqual(90, Candle.objects.count())
+        self.assertEqual(1, Instrument.objects.count())
+        # plus, if no exceptions were thrown, then everything was fine
