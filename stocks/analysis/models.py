@@ -16,11 +16,12 @@ class Instrument(models.Model):
 
 class Candle(models.Model):
     instrument = models.ForeignKey(Instrument, models.CASCADE, related_name='candles')
-    # datetime
-    # price_open
-    # price_high
-    # price_low
-    # price_close
+    time = models.DateTimeField()
+    open = models.FloatField()
+    high = models.FloatField()
+    low = models.FloatField()
+    close = models.FloatField()
+    interval = models.CharField(max_length=10)
 
     class Meta:
         verbose_name = 'Котировка'

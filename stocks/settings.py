@@ -43,8 +43,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    'stocks.analysis',
-    'background_task'
+    'background_task',
+    'stocks.analysis'
 ]
 
 MIDDLEWARE = [

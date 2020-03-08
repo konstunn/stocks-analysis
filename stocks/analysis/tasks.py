@@ -1,5 +1,6 @@
 import functools
 import itertools
+import math
 import time
 from typing import List
 from datetime import datetime, timedelta
@@ -8,10 +9,11 @@ from django.conf import settings
 from django.db import transaction
 
 from stocks.analysis.models import Instrument
-from stocks.analysis.serializers import InstrumentFromTinkoffSerializer
+from stocks.analysis.serializers import InstrumentFromTinkoffSerializer, CandleSerializer
 
 from openapi_client.openapi import sandbox_api_client, SandboxOpenApi
-from openapi_genclient.models import MarketInstrumentListResponse, MarketInstrumentList, MarketInstrument
+from openapi_genclient.models import \
+    MarketInstrumentListResponse, MarketInstrumentList, MarketInstrument, SearchMarketInstrument
 from openapi_genclient.models import Candles, Candle, CandlesResponse, CandleResolution
 from openapi_genclient.models import Currency
 from openapi_genclient.exceptions import ApiException
@@ -83,7 +85,7 @@ def get_candles(figi: str, _from: datetime, to: datetime, granularity_interval: 
     overall_interval = to - _from
     max_overall_interval = get_max_overall_interval_from_granularity_interval(granularity_interval)
 
-    sub_intervals_count = overall_interval // max_overall_interval + 1
+    sub_intervals_count = math.ceil(overall_interval / max_overall_interval)
 
     sub_interval_length = overall_interval / sub_intervals_count
 
@@ -100,9 +102,7 @@ def get_candles(figi: str, _from: datetime, to: datetime, granularity_interval: 
                 retry_on_rate_limits_exception(tinkoff_client.market.market_search_by_figi_get)
 
             response: MarketInstrumentListResponse = market_search_by_figi_with_retry_on_rate_limits(figi)
-            payload: MarketInstrumentList = response.payload
-            instruments: List[MarketInstrument] = payload.instruments
-            instrument = instruments[0]
+            instrument: SearchMarketInstrument = response.payload
             instrument_serializer = InstrumentFromTinkoffSerializer(data=instrument.to_dict())
             instrument_serializer.is_valid(raise_exception=True)
             instrument_serializer.save()
@@ -121,6 +121,6 @@ def get_candles(figi: str, _from: datetime, to: datetime, granularity_interval: 
             candles: List[Candle] = payload.candles
 
             for candle in candles:
-                # TODO: serialize and save candles
-                raise NotImplementedError('not implemented yet')
-                pass
+                candle_serializer = CandleSerializer(data=candle.to_dict())
+                candle_serializer.is_valid(raise_exception=True)
+                candle_serializer.save()
