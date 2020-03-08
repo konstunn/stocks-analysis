@@ -9,7 +9,7 @@ from django.conf import settings
 from django.db import transaction
 
 from stocks.analysis.models import Instrument
-from stocks.analysis.serializers import InstrumentFromTinkoffSerializer, CandleSerializer
+from stocks.analysis.serializers import InstrumentSerializer, CandleSerializer
 
 from openapi_client.openapi import sandbox_api_client, SandboxOpenApi
 from openapi_genclient.models import \
@@ -19,6 +19,12 @@ from openapi_genclient.models import Currency
 from openapi_genclient.exceptions import ApiException
 
 
+def get_next_delay(last_delay):
+    next_delay = last_delay * 3
+    return next_delay
+
+
+# there are little chances that our application could be banned and so that we will fail to handle rate limits
 def retry_on_rate_limits_exception(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
@@ -29,7 +35,7 @@ def retry_on_rate_limits_exception(func):
             except ApiException as exc:
                 if exc.status == 429:
                     time.sleep(delay)
-                    delay *= 2
+                    delay = get_next_delay(delay)
                 else:
                     raise
     return wrapper
@@ -47,7 +53,7 @@ def get_instruments(currency=Currency.RUB):
     with transaction.atomic():
         for instrument in instruments:
             data = instrument.to_dict()
-            instrument = InstrumentFromTinkoffSerializer(data=data)
+            instrument = InstrumentSerializer(data=data)
             instrument.is_valid(raise_exception=True)
             instrument.save()
 
@@ -103,16 +109,16 @@ def get_candles(figi: str, _from: datetime, to: datetime, granularity_interval: 
 
             response: MarketInstrumentListResponse = market_search_by_figi_with_retry_on_rate_limits(figi)
             instrument: SearchMarketInstrument = response.payload
-            instrument_serializer = InstrumentFromTinkoffSerializer(data=instrument.to_dict())
+            instrument_serializer = InstrumentSerializer(data=instrument.to_dict())
             instrument_serializer.is_valid(raise_exception=True)
             instrument_serializer.save()
 
         for start, end in pairwise(time_points):
 
             market_candles_get_with_retry_on_rate_limits = \
-                retry_on_rate_limits_exception(tinkoff_client.market.market_candles_get)
+                retry_on_rate_limits_exception(tinkoff_client.market.market_candles_get_with_http_info)
 
-            response: CandlesResponse = market_candles_get_with_retry_on_rate_limits(figi,
+            response, status, headers = market_candles_get_with_retry_on_rate_limits(figi,
                                                                                      start,
                                                                                      end,
                                                                                      granularity_interval)

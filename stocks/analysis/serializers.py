@@ -5,7 +5,7 @@ from rest_framework import serializers
 from stocks.analysis.models import Instrument, Candle
 
 
-class InstrumentFromTinkoffSerializer(ModelSerializer):
+class InstrumentSerializer(ModelSerializer):
     class Meta:
         model = Instrument
         fields = (
