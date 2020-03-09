@@ -3,7 +3,7 @@ from django.db import models
 
 
 class Instrument(models.Model):
-    figi = models.CharField(max_length=20, unique=True)
+    figi = models.CharField(max_length=20, unique=True, db_index=True)
     ticker = models.CharField(max_length=20, unique=True)
     name = models.CharField(max_length=256)
     type = models.CharField(max_length=20)
