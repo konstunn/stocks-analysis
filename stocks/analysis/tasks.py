@@ -8,15 +8,16 @@ from datetime import datetime, timedelta
 from django.conf import settings
 from django.db import transaction
 
-from stocks.analysis.models import Instrument
-from stocks.analysis.serializers import InstrumentSerializer, CandleSerializer
-
 from openapi_client.openapi import sandbox_api_client, SandboxOpenApi
 from openapi_genclient.models import \
     MarketInstrumentListResponse, MarketInstrumentList, MarketInstrument, SearchMarketInstrument
 from openapi_genclient.models import Candles, Candle, CandlesResponse, CandleResolution
 from openapi_genclient.models import Currency
 from openapi_genclient.exceptions import ApiException
+
+from stocks.analysis import models
+from stocks.analysis.models import Instrument
+from stocks.analysis.serializers import InstrumentSerializer, CandleSerializer
 
 
 def get_next_delay(last_delay):
