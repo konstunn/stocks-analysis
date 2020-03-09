@@ -37,33 +37,30 @@ To Be Done
 
 ```
 ---------------------------------------------------
-получить список акций
+создать задание на загрузку списка акций
 
 POST /tasks/
 {
-    "action": "get_stocks_list"
-    "stocks_tickers":  ["ALRS", "YNDX"]  # TODO: think about it
+    "action": "get_instruments"
 }
 response:
 {
-    "id": <id>,
-    "status": <status>
+    "id": <id>
 }
 
 ---------------------------------------------------
-загрузить котировки акций
+создать задание на загрузку котировок акций
 
 POST /tasks/
 {
-    "action": "get_stocks_quotes",
+    "action": "get_candles",
     "from": <from>,
     "to": <to>,
-    "stocks_ticker": <ticker>
+    "figi": <ticker>
 }
 response:
 {
-    "id": <id>,
-    "status": <status>
+    "id": <id>
 }
 
 ---------------------------------------------------
@@ -72,13 +69,13 @@ response:
 GET /tasks/available_actions/
 response:
 {
-    ["get_stocks_list", "get_stocks_quotes"]
+    ["get_instruments", "get_candles"]
 }
 
 ---------------------------------------------------
 список загруженных акций
 
-GET /stocks/
+GET /instruments/
 response:
 {
     [...]
@@ -87,7 +84,7 @@ response:
 ---------------------------------------------------
 список загруженных котировок за заданный период
 
-GET /stocks/<ticker>/quotes?from=<from>&to=<to>
+GET /instruments/<ticker>/quotes?from=<from>&to=<to>&interval=<interval>
 response:
 {
     [...]
@@ -96,7 +93,7 @@ response:
 ---------------------------------------------------
 получить сводную информацию по всем акциям за заданный период
 
-GET /stocks/summary?from=<from>&to=<to>
+GET /instruments/summary?from=<from>&to=<to>?&interval=<interval>
 response:
 {
     [...]
