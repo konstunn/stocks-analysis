@@ -1,6 +1,8 @@
 
 from django.db import models
 
+from background_task.models import Task
+
 
 class Instrument(models.Model):
     figi = models.CharField(max_length=20, unique=True, db_index=True)
@@ -26,3 +28,14 @@ class Candle(models.Model):
     class Meta:
         verbose_name = 'Котировка'
         verbose_name_plural = 'Котировки'
+
+
+class TaskProxy(Task):
+    action = models.CharField(max_length=80)
+    _from = models.DateTimeField(name='from', null=True)
+    to = models.DateTimeField(null=True)
+    interval = models.CharField(max_length=10, null=True)
+
+    class Meta:
+        verbose_name = 'Прокси-задача'
+        verbose_name_plural = 'Прокси-задачи'
