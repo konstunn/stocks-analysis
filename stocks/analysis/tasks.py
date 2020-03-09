@@ -53,9 +53,10 @@ def get_instruments(currency=Currency.RUB):
     with transaction.atomic():
         for instrument in instruments:
             data = instrument.to_dict()
-            instrument = InstrumentSerializer(data=data)
-            instrument.is_valid(raise_exception=True)
-            instrument.save()
+            if not Instrument.objects.filter(figi=instrument.figi):
+                instrument = InstrumentSerializer(data=data)
+                instrument.is_valid(raise_exception=True)
+                instrument.save()
 
 
 GRANULARITY_INTERVAL_TO_MAX_OVERALL_INTERVAL_MAP = {
