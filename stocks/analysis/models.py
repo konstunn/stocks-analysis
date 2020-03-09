@@ -35,6 +35,7 @@ class TaskProxy(Task):
     _from = models.DateTimeField(name='from', null=True)
     to = models.DateTimeField(null=True)
     interval = models.CharField(max_length=10, null=True)
+    figi = models.CharField(max_length=20, null=True)
 
     class Meta:
         verbose_name = 'Прокси-задача'
