@@ -1,13 +1,23 @@
 from django.shortcuts import render
+from rest_framework.viewsets import GenericViewSet
+from rest_framework import mixins
 
-# Create your views here.
+from stocks.analysis.serializers import InstrumentSerializer, CandleSerializer
 
 
-class StockViewSet:
+class TaskViewSet(mixins.CreateModelMixin,
+                  mixins.RetrieveModelMixin,
+                  mixins.ListModelMixin,
+                  GenericViewSet):
+
     pass
 
 
-class QuotationViewSet:
-    pass
+class InstrumentViewSet(mixins.ListModelMixin,
+                        GenericViewSet):
+    serializer_class = InstrumentSerializer
 
 
+class CandleViewSet(mixins.ListModelMixin,
+                    GenericViewSet):
+    serializer_class = CandleSerializer

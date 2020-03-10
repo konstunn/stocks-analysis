@@ -31,6 +31,7 @@ class Candle(models.Model):
 
 
 class TaskProxy(Task):
+    # task = models.ForeignKey(Task, models.CASCADE, related_name='proxies')
     action = models.CharField(max_length=80)
     _from = models.DateTimeField(name='from', null=True)
     to = models.DateTimeField(null=True)

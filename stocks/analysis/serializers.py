@@ -41,22 +41,23 @@ class CandleSerializer(ModelSerializer):
 ACTION_CHOICE = ('get_instruments', 'get_candles')
 
 
+class GetInstrumentsTaskSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TaskProxy
+        fields = (
+            'action'
+        )
+
+    action = serializers.ChoiceField(choices=('get_instruments',), required=True)
+    task = serializers.PrimaryKeyRelatedField(read_only=True)
+
+
 class TaskProxySerializer(serializers.ModelSerializer):
     action = serializers.ChoiceField(choices=ACTION_CHOICE, required=True)
     interval = serializers.ChoiceField(choices=CandleResolution.allowable_values, required=False)
     _from = serializers.DateTimeField(source='from', required=False)
     to = serializers.DateTimeField(required=False)
     figi = serializers.CharField(required=False)
-
-    class Meta:
-        model = TaskProxy
-        fields = (
-            'from',
-            'to',
-            'interval',
-            'action',
-            'figi'
-        )
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -66,8 +67,15 @@ class TaskProxySerializer(serializers.ModelSerializer):
             if len(attrs) > 1:
                 raise ValidationError('extra fields {} for action = {}'.format(attrs.pop('action'), action))
         elif action == 'get_candles':
-            # TODO: heavy validation to exclude from to overlapping between tasks goes here
-            pass
+            _from = attrs.get('from')
+            to = attrs.get('to')
+            figi = attrs.g
+
+            if not _from or not to or _from >= to:
+                raise ValidationError(
+                    'datetimes "from" and "to" required, such that from < to, but {} >= {}'.format(_from, to))
+
+        return attrs
 
     def create(self, validated_data):
         # TODO: schedule task
