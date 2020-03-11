@@ -1,9 +1,10 @@
 from openapi_genclient import CandleResolution
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, MethodNotAllowed
 from rest_framework.serializers import ModelSerializer
 from rest_framework import serializers
 
-from stocks.analysis.models import Instrument, Candle, TaskProxy
+from stocks.analysis.models import Instrument, Candle
+from stocks.analysis import tasks
 
 
 class InstrumentSerializer(ModelSerializer):
@@ -41,15 +42,18 @@ class CandleSerializer(ModelSerializer):
 ACTION_CHOICE = ('get_instruments', 'get_candles')
 
 
-class GetInstrumentsTaskSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = TaskProxy
-        fields = (
-            'action'
-        )
+class GetInstrumentsTaskSerializer(serializers.Serializer):
 
     action = serializers.ChoiceField(choices=('get_instruments',), required=True)
     task = serializers.PrimaryKeyRelatedField(read_only=True)
+
+    def create(self, validated_data):
+        task = tasks.get_instruments()
+        # print('hi')
+        return task
+
+    def update(self, instance, validated_data):
+        raise MethodNotAllowed('task updates are not supported')
 
 
 class TaskProxySerializer(serializers.ModelSerializer):

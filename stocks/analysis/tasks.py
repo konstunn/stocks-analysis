@@ -7,6 +7,8 @@ from datetime import datetime, timedelta
 
 from django.conf import settings
 
+from background_task import background
+
 from openapi_client.openapi import sandbox_api_client, SandboxOpenApi
 
 from openapi_genclient.models import \
@@ -18,7 +20,8 @@ from openapi_genclient.exceptions import ApiException
 
 from stocks.analysis import models
 from stocks.analysis.models import Instrument
-from stocks.analysis.serializers import InstrumentSerializer, CandleSerializer
+# from stocks.analysis.serializers import InstrumentSerializer, CandleSerializer
+from stocks.analysis import serializers
 
 
 DELAY_LIMIT = 120
@@ -49,6 +52,7 @@ def retry_on_rate_limits_exception(func):
     return wrapper
 
 
+@background
 @retry_on_rate_limits_exception
 def get_instruments(currency=Currency.RUB):
     tinkoff_client: SandboxOpenApi = sandbox_api_client(settings.TINKOFF_INVESTMENTS_SANDBOX_OPEN_API_TOKEN)
@@ -61,7 +65,7 @@ def get_instruments(currency=Currency.RUB):
     for instrument in instruments:
         data = instrument.to_dict()
         if not Instrument.objects.filter(figi=instrument.figi):
-            instrument = InstrumentSerializer(data=data)
+            instrument = serializers.InstrumentSerializer(data=data)
             instrument.is_valid(raise_exception=True)
             instrument.save()
 
@@ -92,6 +96,7 @@ def pairwise(iterable):
     return zip(a, b)
 
 
+@background
 def get_candles(figi: str, _from: datetime, to: datetime, granularity_interval: str):
     if granularity_interval not in CandleResolution.allowable_values:
         raise ValueError(f'granularity_interval = {granularity_interval} not in {CandleResolution.allowable_values}')
@@ -115,7 +120,7 @@ def get_candles(figi: str, _from: datetime, to: datetime, granularity_interval: 
 
         response: MarketInstrumentListResponse = market_search_by_figi_with_retry_on_rate_limits(figi)
         instrument: SearchMarketInstrument = response.payload
-        instrument_serializer = InstrumentSerializer(data=instrument.to_dict())
+        instrument_serializer = serializers.InstrumentSerializer(data=instrument.to_dict())
         instrument_serializer.is_valid(raise_exception=True)
         instrument_serializer.save()
 
@@ -136,6 +141,6 @@ def get_candles(figi: str, _from: datetime, to: datetime, granularity_interval: 
 
         for candle in candles:
             if not models.Candle.objects.filter(instrument=instrument, time=candle.time, interval=candle.interval):
-                candle_serializer = CandleSerializer(data=candle.to_dict())
+                candle_serializer = serializers.CandleSerializer(data=candle.to_dict())
                 candle_serializer.is_valid(raise_exception=True)
                 candle_serializer.save()
