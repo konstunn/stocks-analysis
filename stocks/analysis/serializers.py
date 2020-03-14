@@ -1,9 +1,13 @@
 from openapi_genclient import CandleResolution
+
 from rest_framework.exceptions import ValidationError, MethodNotAllowed
 from rest_framework.serializers import ModelSerializer
 from rest_framework import serializers
 
+from background_task.models import Task as BackgroundTask
+
 from stocks.analysis.models import Instrument, Candle
+from stocks.analysis import models
 from stocks.analysis import tasks
 
 
@@ -42,45 +46,66 @@ class CandleSerializer(ModelSerializer):
 ACTION_CHOICE = ('get_instruments', 'get_candles')
 
 
-class GetInstrumentsTaskSerializer(serializers.Serializer):
+class GetInstrumentsTaskSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.GetDataTask
+        fields = (
+            'id',
+            'background_task',
+            'action',
+            'ctime',
+            'end_at',
+            'succeeded'
+        )
 
-    action = serializers.ChoiceField(choices=('get_instruments',), required=True)
-    task = serializers.PrimaryKeyRelatedField(read_only=True)
+    action = serializers.ChoiceField(choices=('get_instruments',), default='get_instruments')
+    id = serializers.IntegerField(read_only=True)
+    background_task = serializers.PrimaryKeyRelatedField(read_only=True)
 
     def create(self, validated_data):
-        task = tasks.get_instruments()
-        # print('hi')
-        return task
+        instance = super().create(validated_data)
+        task = tasks.get_instruments(get_data_task_pk=instance.pk)
+        instance.background_task = task
+        instance.save(update_fields=('background_task',))
+        return instance
 
     def update(self, instance, validated_data):
         raise MethodNotAllowed('task updates are not supported')
 
 
-class TaskProxySerializer(serializers.ModelSerializer):
-    action = serializers.ChoiceField(choices=ACTION_CHOICE, required=True)
-    interval = serializers.ChoiceField(choices=CandleResolution.allowable_values, required=False)
-    _from = serializers.DateTimeField(source='from', required=False)
-    to = serializers.DateTimeField(required=False)
-    figi = serializers.CharField(required=False)
+class GetCandlesTaskSerializer(serializers.ModelSerializer):
+    action = serializers.CharField(default='get_candles')
+    interval = serializers.ChoiceField(choices=CandleResolution.allowable_values)
+    from_time = serializers.DateTimeField(required=True)
+    to_time = serializers.DateTimeField(required=True)
+    # figi = serializers.SlugRelatedField(slug_field='figi', queryset=Instrument.objects.all())
+    figi = serializers.CharField()
 
-    def validate(self, attrs):
-        attrs = super().validate(attrs)
-        action = attrs['action']
+    class Meta:
+        model = models.GetDataTask
+        fields = (
+            'id',
+            'background_task',
+            'action',
+            'ctime',
+            'end_at',
+            'succeeded',
+            'to_time',
+            'from_time',
+            'interval',
+            'figi'
+        )
 
-        if action == 'get_instruments':  # TODO: make a enum
-            if len(attrs) > 1:
-                raise ValidationError('extra fields {} for action = {}'.format(attrs.pop('action'), action))
-        elif action == 'get_candles':
-            _from = attrs.get('from')
-            to = attrs.get('to')
-            figi = attrs.g
-
-            if not _from or not to or _from >= to:
-                raise ValidationError(
-                    'datetimes "from" and "to" required, such that from < to, but {} >= {}'.format(_from, to))
-
-        return attrs
+    id = serializers.IntegerField(read_only=True)
+    background_task = serializers.PrimaryKeyRelatedField(read_only=True)
 
     def create(self, validated_data):
-        # TODO: schedule task
-        pass
+        instance = super().create(validated_data)
+        task = tasks.get_candles(get_data_task_pk=instance.pk)
+        instance.background_task = task
+        instance.save(update_fields=('background_task',))
+        return instance
+
+    def update(self, instance, validated_data):
+        raise MethodNotAllowed('task updates are not supported')
+

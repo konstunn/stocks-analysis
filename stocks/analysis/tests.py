@@ -1,58 +1,70 @@
 
 import datetime
+import logging
 
 import pytz
+
 from django.urls import reverse
 from django.utils import timezone
+from django.core.management import call_command
 
-from openapi_genclient import (
-    MarketInstrumentListResponse, MarketInstrumentList, MarketInstrument, CandleResolution
-)
 from rest_framework import status
+from rest_framework.test import APITestCase
 
-from stocks.analysis import tasks
+from openapi_client.openapi import sandbox_api_client
+from openapi_genclient import (
+    MarketInstrumentListResponse,
+    MarketInstrumentList,
+    MarketInstrument,
+    CandleResolution
+)
+
+from stocks.analysis import tasks, serializers, models
 from stocks.analysis.models import Candle, Instrument
 from stocks.settings import TINKOFF_INVESTMENTS_SANDBOX_OPEN_API_TOKEN
-
-from rest_framework.test import APITestCase
-from openapi_client.openapi import sandbox_api_client
 
 
 class TestGetInstrumentsTask(APITestCase):
     def test_(self):
-        tasks.get_instruments.now()
+        task = models.GetDataTask.objects.create(action='get_data_task')
+        tasks.get_instruments.now(get_data_task_pk=task.pk)
         # if no exceptions were thrown, then everything was fine
 
 
+def get_figi():
+    ticker = 'ALRS'
+
+    tinkoff_client = sandbox_api_client(TINKOFF_INVESTMENTS_SANDBOX_OPEN_API_TOKEN)
+    response: MarketInstrumentListResponse = tinkoff_client.market.market_search_by_ticker_get(ticker)
+
+    payload: MarketInstrumentList = response.payload
+    instrument: MarketInstrument = payload.instruments[0]
+
+    return instrument.figi
+
+
 class TestGetCandlesTask(APITestCase):
-    @staticmethod
-    def _get_figi():
-        ticker = 'ALRS'
-
-        tinkoff_client = sandbox_api_client(TINKOFF_INVESTMENTS_SANDBOX_OPEN_API_TOKEN)
-        response: MarketInstrumentListResponse = tinkoff_client.market.market_search_by_ticker_get(ticker)
-
-        payload: MarketInstrumentList = response.payload
-        instrument: MarketInstrument = payload.instruments[0]
-
-        return instrument.figi
 
     def test_low_granularity(self):
-        figi = self._get_figi()
+        figi = get_figi()
         to = timezone.datetime(year=2020, month=2, day=8, tzinfo=pytz.UTC)
         _from = to - datetime.timedelta(days=7)
         granularity = CandleResolution.HOUR
-        tasks.get_candles.now(figi, _from, to, granularity)
+        task = models.GetDataTask.objects.create(figi=figi, from_time=_from, to_time=to, interval=granularity)
+        tasks.get_candles.now(get_data_task_pk=task.pk)
+
+        # the amount of historical data is not going to change
         self.assertEqual(45, Candle.objects.count())
         self.assertEqual(1, Instrument.objects.count())
         # plus, if no exceptions were thrown, then everything was fine
 
     def test_high_granularity(self):
-        figi = self._get_figi()
+        figi = get_figi()
         to = timezone.datetime(year=2020, month=2, day=15, tzinfo=pytz.UTC)
         _from = to - datetime.timedelta(days=14)
         granularity = CandleResolution.HOUR
-        tasks.get_candles.now(figi, _from, to, granularity)
+        task = models.GetDataTask.objects.create(figi=figi, from_time=_from, to_time=to, interval=granularity)
+        tasks.get_candles.now(get_data_task_pk=task.pk)
 
         # the amount of historical data is not going to change
         self.assertEqual(90, Candle.objects.count())
@@ -70,12 +82,30 @@ class TestInstrumentsViewSet(APITestCase):
 
 class TestTaskViewSet(APITestCase):
     def test_post_task_get_instruments(self):
-        self.skipTest('skip')
-        url = reverse('task-list')
+        url = reverse('task-get-instruments')
         response = self.client.post(url, data=dict(action='get_instruments'))
-        self.assertEqual(status.HTTP_200_OK, response.status_code,
+        self.assertEqual(status.HTTP_201_CREATED, response.status_code,
                          response.content)
+        call_command('process_tasks', duration=5, verbosity=3)
+        self.assertGreater(Instrument.objects.count(), 0)
 
-        from django.core.management import call_command
-        #
-        call_command('process_tasks')
+    def test_post_task_get_candles(self):
+        url = reverse('task-get-instruments')
+        response = self.client.post(url, data=dict(action='get_instruments'))
+        self.assertEqual(status.HTTP_201_CREATED, response.status_code,
+                         response.content)
+        call_command('process_tasks', duration=5, verbosity=3)
+
+        url = reverse('task-get-candles')
+        data = {
+            'action': 'get_candles',
+            'from_time': timezone.now() - datetime.timedelta(days=7),
+            'to_time': timezone.now(),
+            'figi': get_figi(),
+            'interval': CandleResolution._1MIN
+        }
+        response = self.client.post(url, data=data)
+        self.assertEqual(status.HTTP_201_CREATED, response.status_code,
+                         response.content)
+        call_command('process_tasks', duration=10, verbosity=3)
+        self.assertGreater(models.Candle.objects.count(), 0)

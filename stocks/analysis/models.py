@@ -30,13 +30,18 @@ class Candle(models.Model):
         verbose_name_plural = 'Котировки'
 
 
-class TaskProxy(Task):
-    # task = models.ForeignKey(Task, models.CASCADE, related_name='proxies')
+class GetDataTask(models.Model):
+    background_task = models.ForeignKey(Task, models.CASCADE, related_name='get_data_tasks', null=True)
     action = models.CharField(max_length=80)
-    _from = models.DateTimeField(name='from', null=True)
-    to = models.DateTimeField(null=True)
+    from_time = models.DateTimeField(null=True)
+    to_time = models.DateTimeField(null=True)
     interval = models.CharField(max_length=10, null=True)
     figi = models.CharField(max_length=20, null=True)
+
+    ctime = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(null=True)
+    end_at = models.DateTimeField(null=True, default=None)
+    succeeded = models.BooleanField(null=True, default=None)
 
     class Meta:
         verbose_name = 'Прокси-задача'
