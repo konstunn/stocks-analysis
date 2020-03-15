@@ -44,7 +44,7 @@ RUN pip install \
 
 COPY . .
 
-ENTRYPOINT ["docker-entrypoint.sh"]
+ENTRYPOINT ["./docker-entrypoint.sh"]
 
 EXPOSE 8000
 

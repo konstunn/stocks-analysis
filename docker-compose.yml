@@ -6,26 +6,45 @@ services:
     image: postgres:12.2-alpine
     restart: always
     environment:
-    # TODO: take these from environment
-    - POSTGRES_PASSWORD=project
-    - POSTGRES_USER=project
-    - POSTGRES_DB=project
+    - POSTGRES_PASSWORD=test
+    - POSTGRES_USER=test
+    - POSTGRES_DB=test
+    volumes:
+    - postgres_volume:/var/lib/postgresql/data
 
-#  nginx:
-#    image: nginx
-
-  backend:
+  web:
     build:
       context: .
-      dockerfile: Dockerfile
       args:
         - http_proxy=${http_proxy}
         - https_proxy=${https_proxy}
-    # TODO: take pg host and port from environment
-    entrypoint: dockerize -wait tcp://pg:5432 -timeout 60s -- bash docker-entrypoint.sh
     environment:
       - http_proxy=${http_proxy}
       - https_proxy=${https_proxy}
+      - PG_HOST=pg
+      - PG_PORT=5432
     depends_on:
       - pg
     restart: on-failure
+    ports:
+      - 8000:8000
+
+  bg-tasks:
+    build:
+      context: .
+      args:
+        - http_proxy=${http_proxy}
+        - https_proxy=${https_proxy}
+    environment:
+      - http_proxy=${http_proxy}
+      - https_proxy=${https_proxy}
+      - PG_HOST=pg
+      - PG_PORT=5432
+    depends_on:
+      - pg
+    restart: always
+    command: manage.py process_tasks
+
+
+volumes:
+  postgres_volume:
