@@ -105,9 +105,6 @@ class TestInstruments(APITestCase):
         print(url)
         response = self.client.get(url)
         self.assertEqual(status.HTTP_200_OK, response.status_code)
-        from pprint import pprint
-        print('hi')
-        pprint(response.json())
 
 
 class TestCandles(APITestCase):

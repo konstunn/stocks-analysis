@@ -48,7 +48,7 @@ ENTRYPOINT ["./docker-entrypoint.sh"]
 
 EXPOSE 8000
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "stock_analysis.wsgi"]
+CMD gunicorn stocks.wsgi:application --bind 0.0.0.0:8000
 
 ENV PYTHONUNBUFFERED 1
 ENV PYTHONDONTWRITEBYTECODE 1
