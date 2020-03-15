@@ -1,6 +1,7 @@
 
 import datetime
 import logging
+import random
 
 import pytz
 
@@ -24,7 +25,28 @@ from stocks.analysis.models import Candle, Instrument
 from stocks.settings import TINKOFF_INVESTMENTS_SANDBOX_OPEN_API_TOKEN
 
 
+def get_figi():
+    ticker = 'ALRS'
+
+    tinkoff_client = sandbox_api_client(TINKOFF_INVESTMENTS_SANDBOX_OPEN_API_TOKEN)
+    response: MarketInstrumentListResponse = tinkoff_client.market.market_search_by_ticker_get(ticker)
+
+    payload: MarketInstrumentList = response.payload
+    instrument: MarketInstrument = payload.instruments[0]
+
+    return instrument.figi
+
+
 class TestInstruments(APITestCase):
+    def _get_instruments(self):
+        url = reverse('task-get-instruments')
+        data = dict(action='get_instruments')
+        response = self.client.post(url, data=data, format='json')
+        self.assertEqual(status.HTTP_201_CREATED, response.status_code)
+
+        task: models.GetDataTask = models.GetDataTask.objects.first()
+        tasks.get_instruments.now(get_data_task_pk=task.pk)
+
     def test_(self):
         url = reverse('task-get-instruments')
         data = dict(action='get_instruments')
@@ -58,17 +80,34 @@ class TestInstruments(APITestCase):
         response = self.client.get(url)
         self.assertEqual(status.HTTP_200_OK, response.status_code)
 
+    def _rand_float(self):
+        return round(random.uniform(10.0, 100.0), 1)
 
-def get_figi():
-    ticker = 'ALRS'
+    def test_summary(self):
+        # self.skipTest('')
+        self._get_instruments()
+        instrument = Instrument.objects.get(ticker='ALRS')
+        base_time = timezone.datetime(2020, 3, 1, 0, 0, 0, tzinfo=pytz.UTC)
 
-    tinkoff_client = sandbox_api_client(TINKOFF_INVESTMENTS_SANDBOX_OPEN_API_TOKEN)
-    response: MarketInstrumentListResponse = tinkoff_client.market.market_search_by_ticker_get(ticker)
+        for i in range(10):
+            time = base_time + i * datetime.timedelta(days=1)
+            print(time)
+            Candle.objects.create(
+                 instrument=instrument,
+                 time=time,
+                 open=self._rand_float(),
+                 high=self._rand_float(),
+                 low=self._rand_float(),
+                 close=self._rand_float()
+            )
 
-    payload: MarketInstrumentList = response.payload
-    instrument: MarketInstrument = payload.instruments[0]
-
-    return instrument.figi
+        url = reverse('instrument-summary') + '?from=2020-03-02 00:00:00Z&to=2020-03-08 00:00:00Z'
+        print(url)
+        response = self.client.get(url)
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        from pprint import pprint
+        print('hi')
+        pprint(response.json())
 
 
 class TestCandles(APITestCase):

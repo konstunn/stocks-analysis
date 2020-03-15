@@ -2,14 +2,28 @@
 from django.db import models
 
 from background_task.models import Task
+from django.db.models import Count, Min, Max
+
+
+class InstrumentManager(models.Manager):
+    def with_candles(self):
+        return self.annotate(
+            candles_count=Count('candles'),
+        ).filter(candles_count__gt=0)
 
 
 class Instrument(models.Model):
+    objects = InstrumentManager()
+
     figi = models.CharField(max_length=20, unique=True, db_index=True)
     ticker = models.CharField(max_length=20, unique=True)
     name = models.CharField(max_length=256)
     type = models.CharField(max_length=20)
     isin = models.CharField(max_length=20, unique=True)
+
+    def __str__(self):
+        return 'Instrument type={}, ticker={}, figi={}'.\
+            format(self.type, self.ticker, self.figi)
 
     class Meta:
         verbose_name = 'Инструмент'
