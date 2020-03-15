@@ -28,6 +28,7 @@ class TestGetInstrumentsTask(APITestCase):
     def test_(self):
         task = models.GetDataTask.objects.create(action='get_data_task')
         tasks.get_instruments.now(get_data_task_pk=task.pk)
+        self.assertGreater(Instrument.objects.count(), 0)
         # if no exceptions were thrown, then everything was fine
 
 
@@ -86,7 +87,7 @@ class TestTaskViewSet(APITestCase):
         response = self.client.post(url, data=dict(action='get_instruments'))
         self.assertEqual(status.HTTP_201_CREATED, response.status_code,
                          response.content)
-        call_command('process_tasks', duration=5, verbosity=3)
+        call_command('process_tasks', duration=3, verbosity=3)
         self.assertGreater(Instrument.objects.count(), 0)
 
     def test_post_task_get_candles(self):
@@ -96,16 +97,21 @@ class TestTaskViewSet(APITestCase):
                          response.content)
         call_command('process_tasks', duration=5, verbosity=3)
 
+        to = timezone.datetime(year=2020, month=2, day=15, tzinfo=pytz.UTC)
+        _from = to - datetime.timedelta(days=14)
+        granularity = CandleResolution.HOUR
+
         url = reverse('task-get-candles')
         data = {
             'action': 'get_candles',
-            'from_time': timezone.now() - datetime.timedelta(days=7),
-            'to_time': timezone.now(),
+            'from_time': _from,
+            'to_time': to,
             'figi': get_figi(),
-            'interval': CandleResolution._1MIN
+            'interval': granularity
         }
         response = self.client.post(url, data=data)
         self.assertEqual(status.HTTP_201_CREATED, response.status_code,
                          response.content)
-        call_command('process_tasks', duration=10, verbosity=3)
-        self.assertGreater(models.Candle.objects.count(), 0)
+        call_command('process_tasks', duration=5, verbosity=3)
+        self.assertEqual(90, Candle.objects.count())
+        self.assertGreater(Instrument.objects.count(), 0)
