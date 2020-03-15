@@ -109,3 +109,51 @@ class GetCandlesTaskSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         raise MethodNotAllowed('task updates are not supported')
 
+
+class SummarySerializer(serializers.ModelSerializer):
+    begin = serializers.SerializerMethodField()
+    end = serializers.SerializerMethodField()
+    absolute_diff = serializers.SerializerMethodField()
+    relative_diff_percents = serializers.SerializerMethodField()
+
+    class Meta:
+        model = models.Instrument
+        fields = (
+            'figi',
+            'ticker',
+            'begin',
+            'end',
+            'name',
+            'absolute_diff',
+            'relative_diff_percents'
+        )
+
+    def get_end(self, instance):
+        request = self.context['request']
+        candles_queryset = instance.candles.order_by('-time')
+
+        to_time = request.query_params.get('to', None)
+        if to_time is not None:
+            candles_queryset = candles_queryset.filter(time__lte=to_time)
+
+        return candles_queryset.first().close
+
+    def get_begin(self, instance):
+        request = self.context['request']
+        candles_queryset = instance.candles.order_by('time')
+
+        from_time = request.query_params.get('from', None)
+        if from_time is not None:
+            candles_queryset = candles_queryset.filter(time__gte=from_time)
+
+        return candles_queryset.first().open
+
+    def get_absolute_diff(self, instance):
+        end = self.get_end(instance)
+        begin = self.get_begin(instance)
+        return round(end - begin, 1)
+
+    def get_relative_diff_percents(self, instance):
+        abs_diff = self.get_absolute_diff(instance)
+        begin = self.get_begin(instance)
+        return round(abs_diff / begin, 2) * 100
