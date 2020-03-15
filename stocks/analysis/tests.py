@@ -24,12 +24,39 @@ from stocks.analysis.models import Candle, Instrument
 from stocks.settings import TINKOFF_INVESTMENTS_SANDBOX_OPEN_API_TOKEN
 
 
-class TestGetInstrumentsTask(APITestCase):
+class TestInstruments(APITestCase):
     def test_(self):
-        task = models.GetDataTask.objects.create(action='get_data_task')
+        url = reverse('task-get-instruments')
+        data = dict(action='get_instruments')
+        response = self.client.post(url, data=data, format='json')
+        self.assertEqual(status.HTTP_201_CREATED, response.status_code)
+
+        self.assertEqual(models.Task.objects.count(), 1)
+        self.assertEqual(models.GetDataTask.objects.count(), 1)
+
+        url = reverse('task-list')
+        response = self.client.get(url)
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+
+        task: models.GetDataTask = models.GetDataTask.objects.first()
+        self.assertIsNone(task.end_at)
+        self.assertFalse(task.succeeded)
+
         tasks.get_instruments.now(get_data_task_pk=task.pk)
+
+        task.refresh_from_db()
+        self.assertIsNotNone(task.end_at)
+        self.assertTrue(task.succeeded)
         self.assertGreater(Instrument.objects.count(), 0)
-        # if no exceptions were thrown, then everything was fine
+
+        url = reverse('instrument-list')
+        response = self.client.get(url)
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+
+        instrument = Instrument.objects.first()
+        url = reverse('instrument-detail', kwargs=dict(pk=instrument.pk))
+        response = self.client.get(url)
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
 
 
 def get_figi():
@@ -44,74 +71,86 @@ def get_figi():
     return instrument.figi
 
 
-class TestGetCandlesTask(APITestCase):
+class TestCandles(APITestCase):
 
     def test_low_granularity(self):
         figi = get_figi()
         to = timezone.datetime(year=2020, month=2, day=8, tzinfo=pytz.UTC)
         _from = to - datetime.timedelta(days=7)
         granularity = CandleResolution.HOUR
-        task = models.GetDataTask.objects.create(figi=figi, from_time=_from, to_time=to, interval=granularity)
+
+        url = reverse('task-get-candles')
+        data = {
+            'figi': figi,
+            'from_time': _from,
+            'to_time': to,
+            'interval': granularity
+        }
+        response = self.client.post(url, data=data)
+        self.assertEqual(status.HTTP_201_CREATED, response.status_code)
+
+        task = models.GetDataTask.objects.first()
+        self.assertIsNone(task.end_at)
+        self.assertFalse(task.succeeded)
+
+        url = reverse('task-list')
+        response = self.client.get(url)
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+
         tasks.get_candles.now(get_data_task_pk=task.pk)
+
+        task.refresh_from_db()
+        self.assertTrue(task.succeeded)
+        self.assertIsNotNone(task.end_at)
 
         # the amount of historical data is not going to change
         self.assertEqual(45, Candle.objects.count())
         self.assertEqual(1, Instrument.objects.count())
-        # plus, if no exceptions were thrown, then everything was fine
+
+        url = reverse('candle-list')
+        response = self.client.get(url)
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
 
     def test_high_granularity(self):
+        # TODO: reduce copy-paste
         figi = get_figi()
-        to = timezone.datetime(year=2020, month=2, day=15, tzinfo=pytz.UTC)
-        _from = to - datetime.timedelta(days=14)
-        granularity = CandleResolution.HOUR
-        task = models.GetDataTask.objects.create(figi=figi, from_time=_from, to_time=to, interval=granularity)
-        tasks.get_candles.now(get_data_task_pk=task.pk)
-
-        # the amount of historical data is not going to change
-        self.assertEqual(90, Candle.objects.count())
-        self.assertEqual(1, Instrument.objects.count())
-        # if no exceptions were thrown so far, then everything was fine
-
-
-class TestCandlesViewSet(APITestCase):
-    pass
-
-
-class TestInstrumentsViewSet(APITestCase):
-    pass
-
-
-class TestTaskViewSet(APITestCase):
-    def test_post_task_get_instruments(self):
-        url = reverse('task-get-instruments')
-        response = self.client.post(url, data=dict(action='get_instruments'))
-        self.assertEqual(status.HTTP_201_CREATED, response.status_code,
-                         response.content)
-        call_command('process_tasks', duration=3, verbosity=3)
-        self.assertGreater(Instrument.objects.count(), 0)
-
-    def test_post_task_get_candles(self):
-        url = reverse('task-get-instruments')
-        response = self.client.post(url, data=dict(action='get_instruments'))
-        self.assertEqual(status.HTTP_201_CREATED, response.status_code,
-                         response.content)
-        call_command('process_tasks', duration=5, verbosity=3)
-
         to = timezone.datetime(year=2020, month=2, day=15, tzinfo=pytz.UTC)
         _from = to - datetime.timedelta(days=14)
         granularity = CandleResolution.HOUR
 
         url = reverse('task-get-candles')
         data = {
-            'action': 'get_candles',
+            'figi': figi,
             'from_time': _from,
             'to_time': to,
-            'figi': get_figi(),
             'interval': granularity
         }
         response = self.client.post(url, data=data)
-        self.assertEqual(status.HTTP_201_CREATED, response.status_code,
-                         response.content)
-        call_command('process_tasks', duration=5, verbosity=3)
+        self.assertEqual(status.HTTP_201_CREATED, response.status_code)
+
+        task = models.GetDataTask.objects.first()
+        self.assertIsNone(task.end_at)
+        self.assertFalse(task.succeeded)
+
+        url = reverse('task-list')
+        response = self.client.get(url)
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+
+        tasks.get_candles.now(get_data_task_pk=task.pk)
+
+        task.refresh_from_db()
+        self.assertTrue(task.succeeded)
+        self.assertIsNotNone(task.end_at)
+
+        # the amount of historical data is not going to change
         self.assertEqual(90, Candle.objects.count())
-        self.assertGreater(Instrument.objects.count(), 0)
+        self.assertEqual(1, Instrument.objects.count())
+
+        url = reverse('candle-list')
+        response = self.client.get(url)
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+
+        # TODO: implement summary
+        url = reverse('instrument-summary')
+        response = self.client.get(url)
+        self.assertEqual(status.HTTP_200_OK, response.status_code)

@@ -18,11 +18,13 @@ from django.urls import path, include
 
 from rest_framework import routers
 
-from stocks.analysis.views import TaskViewSet
+from stocks.analysis import views
 
 
 router = routers.SimpleRouter()
-router.register('tasks', TaskViewSet, basename='task')
+router.register('tasks', views.TaskViewSet, basename='task')
+router.register('instruments', views.InstrumentViewSet, basename='instrument')
+router.register('candles', views.CandleViewSet, basename='candle')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
