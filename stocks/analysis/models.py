@@ -45,7 +45,7 @@ class Candle(models.Model):
 
 
 class GetDataTask(models.Model):
-    background_task = models.ForeignKey(Task, models.CASCADE, related_name='get_data_tasks', null=True)
+    background_task = models.ForeignKey(Task, models.SET_NULL, related_name='get_data_tasks', null=True)
     action = models.CharField(max_length=80)
     from_time = models.DateTimeField(null=True)
     to_time = models.DateTimeField(null=True)

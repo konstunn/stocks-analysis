@@ -61,6 +61,8 @@ class GetInstrumentsTaskSerializer(serializers.ModelSerializer):
     action = serializers.ChoiceField(choices=('get_instruments',), default='get_instruments')
     id = serializers.IntegerField(read_only=True)
     background_task = serializers.PrimaryKeyRelatedField(read_only=True)
+    succeeded = serializers.BooleanField(read_only=True)
+    end_at = serializers.DateTimeField(read_only=True)
 
     def create(self, validated_data):
         instance = super().create(validated_data)

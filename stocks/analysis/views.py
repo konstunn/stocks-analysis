@@ -1,14 +1,18 @@
+
 from django.db.models import Min, Max
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
+from rest_framework import exceptions
 from rest_framework import mixins
 
 from stocks.analysis import models
 from stocks.analysis.serializers import \
     InstrumentSerializer, \
     CandleSerializer, \
-    GetInstrumentsTaskSerializer, GetCandlesTaskSerializer, SummarySerializer
+    GetInstrumentsTaskSerializer, \
+    GetCandlesTaskSerializer, \
+    SummarySerializer
 
 
 class TaskViewSet(mixins.CreateModelMixin,
@@ -16,13 +20,20 @@ class TaskViewSet(mixins.CreateModelMixin,
                   mixins.ListModelMixin,
                   GenericViewSet):
     queryset = models.GetDataTask.objects.all().order_by('-ctime')
+    http_method_names = ['get', 'post']
+
+    def create(self, request, *args, **kwargs):
+        raise exceptions.MethodNotAllowed(request.method)
 
     def get_serializer_class(self):
         if self.action == 'get_instruments':
+            # this serializer should be write only
             return GetInstrumentsTaskSerializer
         elif self.action == 'get_candles':
+            # this serializer should be write only
             return GetCandlesTaskSerializer
         else:
+            # this serializer should be read only
             return GetInstrumentsTaskSerializer
 
     @action(detail=False, methods=['post'])

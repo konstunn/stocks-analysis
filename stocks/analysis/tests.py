@@ -46,6 +46,7 @@ class TestInstruments(APITestCase):
 
         task: models.GetDataTask = models.GetDataTask.objects.first()
         tasks.get_instruments.now(get_data_task_pk=task.pk)
+        self.assertEqual(1, models.GetDataTask.objects.count())
 
     def test_(self):
         url = reverse('task-get-instruments')
@@ -91,7 +92,6 @@ class TestInstruments(APITestCase):
 
         for i in range(10):
             time = base_time + i * datetime.timedelta(days=1)
-            print(time)
             Candle.objects.create(
                  instrument=instrument,
                  time=time,
@@ -102,7 +102,6 @@ class TestInstruments(APITestCase):
             )
 
         url = reverse('instrument-summary') + '?from=2020-03-02 00:00:00Z&to=2020-03-08 00:00:00Z'
-        print(url)
         response = self.client.get(url)
         self.assertEqual(status.HTTP_200_OK, response.status_code)
 

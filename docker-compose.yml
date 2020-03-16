@@ -1,16 +1,16 @@
-version: "2.1"
+version: "3"
 
 services:
 
   pg:
-    image: postgres:12.2-alpine
+    image: postgres:9.5-alpine
     restart: always
     environment:
-    - POSTGRES_PASSWORD=test
-    - POSTGRES_USER=test
-    - POSTGRES_DB=test
+      - POSTGRES_PASSWORD=test
+      - POSTGRES_USER=test
+      - POSTGRES_DB=test
     volumes:
-    - postgres_volume:/var/lib/postgresql/data
+      - postgres_volume:/var/lib/postgresql/data
 
   web:
     build:
@@ -25,9 +25,10 @@ services:
       - PG_PORT=5432
     depends_on:
       - pg
-#    restart: on-failure
+    restart: on-failure
     ports:
       - 8000:8000
+    command: python manage.py runserver 0.0.0.0:8000
 
   bg-tasks:
     build:
@@ -42,8 +43,10 @@ services:
       - PG_PORT=5432
     depends_on:
       - pg
-#    restart: always
-    command: python manage.py process_tasks
+      - web
+    restart: on-failure
+    entrypoint: ""
+    command: dockerize -wait tcp://web:8000 -timeout 60s -- python manage.py process_tasks
 
 
 volumes:
