@@ -46,7 +46,7 @@ services:
       - web
     restart: on-failure
     entrypoint: ""
-    command: dockerize -wait tcp://web:8000 -timeout 60s -- python manage.py process_tasks
+    command: dockerize -wait tcp://web:8000 -timeout 60s -- python manage.py process_tasks -v=3 --log-std
 
 
 volumes:
